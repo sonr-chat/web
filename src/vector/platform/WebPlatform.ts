@@ -18,7 +18,6 @@ limitations under the License.
 
 import { UpdateCheckStatus, UpdateStatus } from "matrix-react-sdk/src/BasePlatform";
 import dis from "matrix-react-sdk/src/dispatcher/dispatcher";
-import { _t } from "matrix-react-sdk/src/languageHandler";
 import { hideToast as hideUpdateToast, showToast as showUpdateToast } from "matrix-react-sdk/src/toasts/UpdateToast";
 import { Action } from "matrix-react-sdk/src/dispatcher/actions";
 import { CheckUpdatesPayload } from "matrix-react-sdk/src/dispatcher/payloads/CheckUpdatesPayload";
@@ -27,6 +26,7 @@ import { logger } from "matrix-js-sdk/src/logger";
 
 import VectorBasePlatform from "./VectorBasePlatform";
 import { parseQs } from "../url_utils";
+import { _t } from "../../languageHandler";
 
 const POKE_RATE_MS = 10 * 60 * 1000; // 10 min
 
@@ -40,6 +40,8 @@ function getNormalizedAppVersion(version: string): string {
 }
 
 export default class WebPlatform extends VectorBasePlatform {
+    private static readonly VERSION = process.env.VERSION!; // baked in by Webpack
+
     public constructor() {
         super();
         // Register service worker if available on this platform
@@ -101,7 +103,7 @@ export default class WebPlatform extends VectorBasePlatform {
     }
 
     public getAppVersion(): Promise<string> {
-        return Promise.resolve(getNormalizedAppVersion(process.env.VERSION));
+        return Promise.resolve(getNormalizedAppVersion(WebPlatform.VERSION));
     }
 
     public startUpdater(): void {
@@ -113,7 +115,7 @@ export default class WebPlatform extends VectorBasePlatform {
         //
         // Ideally, loading an old copy would be impossible with the
         // cache-control: nocache HTTP header set, but Firefox doesn't always obey it :/
-        console.log("startUpdater, current version is " + getNormalizedAppVersion(process.env.VERSION));
+        console.log("startUpdater, current version is " + getNormalizedAppVersion(WebPlatform.VERSION));
         this.pollForUpdate((version: string, newVersion: string) => {
             const query = parseQs(location);
             if (query.updated) {
@@ -144,7 +146,7 @@ export default class WebPlatform extends VectorBasePlatform {
     ): Promise<UpdateStatus> => {
         return this.getMostRecentVersion().then(
             (mostRecentVersion) => {
-                const currentVersion = getNormalizedAppVersion(process.env.VERSION);
+                const currentVersion = getNormalizedAppVersion(WebPlatform.VERSION);
 
                 if (currentVersion !== mostRecentVersion) {
                     if (this.shouldShowUpdate(mostRecentVersion)) {
@@ -165,7 +167,7 @@ export default class WebPlatform extends VectorBasePlatform {
                 logger.error("Failed to poll for update", err);
                 return {
                     status: UpdateCheckStatus.Error,
-                    detail: err.message || err.status ? err.status.toString() : "Unknown Error",
+                    detail: err.message || (err.status ? err.status.toString() : "Unknown Error"),
                 };
             },
         );
@@ -200,7 +202,7 @@ export default class WebPlatform extends VectorBasePlatform {
         let osName = ua.getOS().name || "unknown OS";
         // Stylise the value from the parser to match Apple's current branding.
         if (osName === "Mac OS") osName = "macOS";
-        return _t("%(appName)s: %(browserName)s on %(osName)s", {
+        return _t("web_default_device_name", {
             appName,
             browserName,
             osName,

@@ -19,10 +19,14 @@ limitations under the License.
 */
 
 import { logger } from "matrix-js-sdk/src/logger";
+import { extractErrorMessageFromError } from "matrix-react-sdk/src/components/views/dialogs/ErrorDialog";
 
 // These are things that can run before the skin loads - be careful not to reference the react-sdk though.
 import { parseQsFromFragment } from "./url_utils";
 import "./modernizr";
+
+// Make setImmediate available in bundle
+import "setimmediate";
 
 // Require common CSS here; this will make webpack process it into bundle.css.
 // Our own CSS (which is themed) is imported via separate webpack entry points
@@ -71,7 +75,7 @@ function checkBrowserFeatures(): boolean {
     // ES2019: http://262.ecma-international.org/10.0/#sec-object.fromentries
     window.Modernizr.addTest("objectfromentries", () => typeof window.Object?.fromEntries === "function");
 
-    const featureList = Object.keys(window.Modernizr);
+    const featureList = Object.keys(window.Modernizr) as Array<keyof ModernizrStatic>;
 
     let featureComplete = true;
     for (const feature of featureList) {
@@ -98,7 +102,7 @@ const supportedBrowser = checkBrowserFeatures();
 // try in react but fallback to an `alert`
 // We start loading stuff but don't block on it until as late as possible to allow
 // the browser to use as much parallelism as it can.
-// Load parallelism is based on research in https://github.com/vector-im/element-web/issues/12253
+// Load parallelism is based on research in https://github.com/element-hq/element-web/issues/12253
 async function start(): Promise<void> {
     // load init.ts async so that its code is not executed immediately and we can catch any exceptions
     const {
@@ -129,7 +133,7 @@ async function start(): Promise<void> {
         // don't try to redirect to the native apps if we're
         // verifying a 3pid (but after we've loaded the config)
         // or if the user is following a deep link
-        // (https://github.com/vector-im/element-web/issues/7378)
+        // (https://github.com/element-hq/element-web/issues/7378)
         const preventRedirect = fragparts.params.client_secret || fragparts.location.length > 0;
 
         if (!preventRedirect) {
@@ -194,19 +198,16 @@ async function start(): Promise<void> {
             await loadConfigPromise;
         } catch (error) {
             // Now that we've loaded the theme (CSS), display the config syntax error if needed.
-            if (error.err && error.err instanceof SyntaxError) {
+            if (error instanceof SyntaxError) {
                 // This uses the default brand since the app config is unavailable.
-                return showError(_t("Your Element is misconfigured"), [
-                    _t(
-                        "Your Element configuration contains invalid JSON. " +
-                            "Please correct the problem and reload the page.",
-                    ),
-                    _t("The message from the parser is: %(message)s", {
-                        message: error.err.message || _t("Invalid JSON"),
+                return showError(_t("error|misconfigured"), [
+                    _t("error|invalid_json"),
+                    _t("error|invalid_json_detail", {
+                        message: error.message || _t("error|invalid_json_generic"),
                     }),
                 ]);
             }
-            return showError(_t("Unable to load config file: please refresh the page to try again."));
+            return showError(_t("error|cannot_load_config"));
         }
 
         // ##################################
@@ -230,8 +231,8 @@ async function start(): Promise<void> {
         logger.error(err);
         // Like the compatibility page, AWOOOOOGA at the user
         // This uses the default brand since the app config is unavailable.
-        await showError(_t("Your Element is misconfigured"), [
-            err.translatedMessage || _t("Unexpected error preparing the app. See console for details."),
+        await showError(_t("error|misconfigured"), [
+            extractErrorMessageFromError(err, _t("error|app_launch_unexpected_error")),
         ]);
     }
 }
@@ -240,7 +241,7 @@ start().catch((err) => {
     logger.error(err);
     // show the static error in an iframe to not lose any context / console data
     // with some basic styling to make the iframe full page
-    delete document.body.style.height;
+    document.body.style.removeProperty("height");
     const iframe = document.createElement("iframe");
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore - typescript seems to only like the IE syntax for iframe sandboxing
@@ -254,5 +255,5 @@ start().catch((err) => {
     iframe.style.right = "0";
     iframe.style.bottom = "0";
     iframe.style.border = "0";
-    document.getElementById("matrixchat").appendChild(iframe);
+    document.getElementById("matrixchat")?.appendChild(iframe);
 });
