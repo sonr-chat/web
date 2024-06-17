@@ -3,7 +3,7 @@
 set -ex
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-DIST_VERSION=$(git describe --abbrev=0 --tags)
+DIST_VERSION=v0.1.0
 
 DIR=$(dirname "$0")
 
